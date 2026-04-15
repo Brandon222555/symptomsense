@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SymptomSense · Self-Diagnostic App</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #21262d;
+    --border: #30363d;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --warn: #d29922;
+    --danger: #f85149;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --radius: 10px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+
+  /* NAV */
+  nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 56px; position: sticky; top: 0; z-index: 100; }
+  .nav-brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.1rem; color: var(--accent); text-decoration: none; }
+  .nav-brand svg { width: 28px; height: 28px; }
+  .nav-tabs { display: flex; gap: 4px; }
+  .nav-tab { background: none; border: none; color: var(--muted); padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.875rem; transition: all .15s; }
+  .nav-tab.active, .nav-tab:hover { background: var(--surface2); color: var(--text); }
+  .nav-tab.active { color: var(--accent); }
+
+  /* LAYOUT */
+  main { max-width: 900px; margin: 0 auto; padding: 28px 20px; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* SECTION HEADERS */
+  h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 6px; }
+  h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 14px; }
+  .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 24px; }
+
+  /* SYMPTOM SEARCH */
+  .search-wrap { position: relative; margin-bottom: 16px; }
+  .search-wrap input { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 16px 12px 42px; color: var(--text); font-size: 0.95rem; outline: none; transition: border-color .2s; }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-wrap svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); width: 18px; height: 18px; }
+  .dropdown { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); max-height: 240px; overflow-y: auto; display: none; position: absolute; width: 100%; z-index: 50; margin-top: 4px; }
+  .dropdown.open { display: block; }
+  .dropdown-item { padding: 10px 16px; cursor: pointer; font-size: 0.9rem; transition: background .1s; }
+  .dropdown-item:hover { background: var(--surface2); }
+
+  /* SELECTED SYMPTOMS */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; min-height: 36px; margin-bottom: 20px; }
+  .chip { display: flex; align-items: center; gap: 6px; background: rgba(88,166,255,.15); border: 1px solid rgba(88,166,255,.35); color: var(--accent); border-radius: 20px; padding: 4px 12px 4px 12px; font-size: 0.82rem; }
+  .chip button { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 1rem; line-height: 1; padding: 0; opacity: .7; }
+  .chip button:hover { opacity: 1; }
+  .empty-chips { color: var(--muted); font-size: 0.85rem; align-self: center; }
+
+  /* EXTRA CONTEXT */
+  .context-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 24px; }
+  .field label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 6px; }
+  .field select, .field input[type=number] { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: var(--text); font-size: 0.9rem; outline: none; }
+  .field select:focus, .field input[type=number]:focus { border-color: var(--accent); }
+
+  /* DURATION SLIDER */
+  .duration-row { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+  .duration-row label { font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
+  .duration-row input[type=range] { flex: 1; accent-color: var(--accent); }
+  .duration-row span { font-size: 0.85rem; color: var(--accent); min-width: 60px; text-align: right; }
+
+  /* ANALYZE BUTTON */
+  .btn-analyze { width: 100%; background: var(--accent); color: #0d1117; border: none; border-radius: var(--radius); padding: 13px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: opacity .2s; margin-bottom: 28px; }
+  .btn-analyze:hover { opacity: .88; }
+  .btn-analyze:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* RESULTS */
+  #results { display: none; }
+  .disclaimer { background: rgba(210,153,34,.08); border: 1px solid rgba(210,153,34,.3); border-radius: var(--radius); padding: 12px 16px; font-size: 0.82rem; color: var(--warn); margin-bottom: 20px; }
+
+  .severity-banner { border-radius: var(--radius); padding: 14px 18px; margin-bottom: 22px; display: flex; align-items: center; gap: 12px; }
+  .severity-banner.home { background: rgba(63,185,80,.1); border: 1px solid rgba(63,185,80,.3); }
+  .severity-banner.doctor { background: rgba(210,153,34,.1); border: 1px solid rgba(210,153,34,.3); }
+  .severity-banner.er { background: rgba(248,81,73,.12); border: 1px solid rgba(248,81,73,.35); }
+  .severity-icon { font-size: 1.6rem; }
+  .severity-text strong { font-size: 1rem; display: block; }
+  .severity-text span { font-size: 0.82rem; color: var(--muted); }
+
+  .conditions-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+  .condition-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .condition-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; cursor: pointer; }
+  .condition-header:hover { background: var(--surface2); }
+  .condition-name { font-weight: 600; font-size: 0.95rem; }
+  .condition-meta { display: flex; align-items: center; gap: 10px; }
+  .match-badge { font-size: 0.75rem; padding: 2px 9px; border-radius: 12px; font-weight: 600; }
+  .match-high { background: rgba(63,185,80,.18); color: var(--accent2); }
+  .match-med { background: rgba(210,153,34,.18); color: var(--warn); }
+  .match-low { background: rgba(139,148,158,.15); color: var(--muted); }
+  .chevron { transition: transform .2s; color: var(--muted); }
+  .condition-body { display: none; padding: 0 16px 14px; border-top: 1px solid var(--border); }
+  .condition-body.open { display: block; }
+  .condition-body p { font-size: 0.88rem; color: var(--muted); margin: 10px 0 10px; }
+  .condition-section { margin-top: 10px; }
+  .condition-section h4 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 6px; }
+  .condition-section ul { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+  .condition-section ul li { background: var(--surface2); border-radius: 6px; padding: 3px 10px; font-size: 0.82rem; }
+  .remedy-pill { color: var(--accent2) !important; background: rgba(63,185,80,.08) !important; border: 1px solid rgba(63,185,80,.2) !important; }
+  .med-pill { color: var(--accent) !important; background: rgba(88,166,255,.08) !important; border: 1px solid rgba(88,166,255,.2) !important; }
+
+  /* LOG PAGE */
+  .log-form { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 24px; }
+  .log-form h2 { margin-bottom: 16px; }
+  .log-form textarea { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; color: var(--text); font-size: 0.9rem; outline: none; resize: vertical; min-height: 80px; }
+  .log-form textarea:focus { border-color: var(--accent); }
+  .log-actions { display: flex; gap: 10px; margin-top: 12px; }
+  .btn-log { background: var(--accent2); color: #0d1117; border: none; border-radius: 8px; padding: 9px 18px; font-weight: 600; font-size: 0.88rem; cursor: pointer; }
+  .btn-log:hover { opacity: .88; }
+  .btn-clear { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); border-radius: 8px; padding: 9px 18px; font-size: 0.88rem; cursor: pointer; }
+  .btn-clear:hover { color: var(--danger); border-color: var(--danger); }
+  .log-entries { display: flex; flex-direction: column; gap: 10px; }
+  .log-entry { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+  .log-entry-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .log-entry-date { font-size: 0.78rem; color: var(--muted); }
+  .log-entry-del { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem; }
+  .log-entry-del:hover { color: var(--danger); }
+  .log-entry-symptoms { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+  .log-entry-note { font-size: 0.85rem; color: var(--muted); font-style: italic; }
+  .empty-log { color: var(--muted); font-size: 0.9rem; text-align: center; padding: 32px 0; }
+
+  /* ABOUT */
+  .about-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+  .about-card h3 { margin-bottom: 8px; font-size: 1rem; }
+  .about-card p { color: var(--muted); font-size: 0.88rem; line-height: 1.6; }
+
+  /* PHOTO UPLOAD */
+  .photo-section { margin-bottom: 24px; }
+  .photo-section-label { font-size: 0.85rem; color: var(--muted); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .photo-section-label strong { color: var(--text); }
+  .photo-dropzone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 22px 16px; text-align: center; cursor: pointer; transition: border-color .2s, background .2s; background: var(--surface); position: relative; }
+  .photo-dropzone:hover, .photo-dropzone.drag-over { border-color: var(--accent); background: rgba(88,166,255,.05); }
+  .photo-dropzone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .photo-dropzone-icon { font-size: 2rem; margin-bottom: 6px; }
+  .photo-dropzone p { font-size: 0.85rem; color: var(--muted); }
+  .photo-dropzone p strong { color: var(--accent); }
+  .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-top: 14px; }
+  .photo-thumb { position: relative; border-radius: 8px; overflow: hidden; aspect-ratio: 1; background: var(--surface2); border: 1px solid var(--border); }
+  .photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: pointer; transition: opacity .15s; }
+  .photo-thumb img:hover { opacity: .85; }
+  .photo-thumb .photo-del { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,.65); border: none; color: #fff; border-radius: 50%; width: 22px; height: 22px; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .15s; }
+  .photo-thumb .photo-del:hover { background: var(--danger); }
+  .photo-thumb .photo-label { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.6); font-size: 0.65rem; color: #ccc; padding: 3px 5px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .photo-tag-select { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; color: var(--text); font-size: 0.78rem; margin-top: 4px; outline: none; }
+
+  /* LIGHTBOX */
+  .lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.88); z-index: 999; align-items: center; justify-content: center; }
+  .lightbox.open { display: flex; }
+  .lightbox img { max-width: 90vw; max-height: 88vh; border-radius: 8px; box-shadow: 0 8px 40px rgba(0,0,0,.6); }
+  .lightbox-close { position: absolute; top: 18px; right: 22px; background: none; border: none; color: #fff; font-size: 2rem; cursor: pointer; line-height: 1; }
+
+  /* LOG PHOTOS */
+  .log-entry-photos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .log-entry-photos img { width: 64px; height: 64px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; }
+
+  /* RESPONSIVE */
+  @media(max-width:540px){ .context-grid{grid-template-columns:1fr;} .nav-tab span{display:none;} .photo-grid{grid-template-columns:repeat(3,1fr);} }
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-brand" href="#">
+    <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="14" cy="14" r="13" stroke="#58a6ff" stroke-width="1.5"/>
+      <path d="M14 7v14M7 14h14" stroke="#58a6ff" stroke-width="2.2" stroke-linecap="round"/>
+      <circle cx="14" cy="14" r="3" fill="#58a6ff"/>
+    </svg>
+    SymptomSense
+  </a>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('checker',this)"><span>🔍 </span>Checker</button>
+    <button class="nav-tab" onclick="showPage('log',this)"><span>📋 </span>Log</button>
+    <button class="nav-tab" onclick="showPage('about',this)"><span>ℹ️ </span>About</button>
+  </div>
+</nav>
+
+<main>
+
+  <!-- CHECKER PAGE -->
+  <div id="page-checker" class="page active">
+    <h1>Symptom Checker</h1>
+    <p class="subtitle">Select your symptoms to get a list of possible conditions, severity guidance, and remedies.</p>
+
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="text" id="symptom-search" placeholder="Search symptoms (e.g. headache, fever, nausea)…" autocomplete="off"/>
+      <div class="dropdown" id="symptom-dropdown"></div>
+    </div>
+
+    <div class="chips" id="chips-container">
+      <span class="empty-chips" id="chips-placeholder">No symptoms selected yet</span>
+    </div>
+
+    <div class="context-grid">
+      <div class="field">
+        <label>Age group</label>
+        <select id="ctx-age">
+          <option value="">Select…</option>
+          <option>Child (0–12)</option>
+          <option>Teen (13–17)</option>
+          <option>Adult (18–59)</option>
+          <option>Senior (60+)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Biological sex</label>
+        <select id="ctx-sex">
+          <option value="">Select…</option>
+          <option>Male</option>
+          <option>Female</option>
+          <option>Prefer not to say</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="duration-row">
+      <label>Symptom duration:</label>
+      <input type="range" id="duration-slider" min="0" max="30" value="1" oninput="updateDuration()"/>
+      <span id="duration-label">1 day</span>
+    </div>
+
+    <!-- PHOTO UPLOAD (CHECKER) -->
+    <div class="photo-section">
+      <div class="photo-section-label">
+        📷 <strong>Exterior symptom photos</strong> &nbsp;— optional, stored only on your device
+      </div>
+      <div class="photo-dropzone" id="checker-dropzone" ondragover="dragOver(event,'checker-dropzone')" ondragleave="dragLeave('checker-dropzone')" ondrop="dropFiles(event,'checker')">
+        <input type="file" accept="image/*" multiple onchange="handleFiles(this.files,'checker')"/>
+        <div class="photo-dropzone-icon">🖼️</div>
+        <p><strong>Click or drag &amp; drop</strong> photos here</p>
+        <p>Rashes, swelling, discoloration, bruising — any visible symptom</p>
+      </div>
+      <div class="photo-grid" id="checker-photo-grid"></div>
+    </div>
+
+    <button class="btn-analyze" id="analyze-btn" onclick="analyze()">Analyze Symptoms</button>
+
+    <div id="results">
+      <div class="disclaimer">⚠️ <strong>Not medical advice.</strong> This tool is for informational purposes only. Always consult a qualified healthcare professional for diagnosis and treatment.</div>
+      <div id="severity-banner"></div>
+      <h2>Possible Conditions</h2>
+      <div class="conditions-list" id="conditions-list"></div>
+    </div>
+  </div>
+
+  <!-- LOG PAGE -->
+  <div id="page-log" class="page">
+    <h1>Symptom Log</h1>
+    <p class="subtitle">Track your symptoms over time to share with a doctor or spot patterns.</p>
+    <div class="log-form">
+      <h2>Add Today's Entry</h2>
+      <div class="chips" id="log-chips" style="margin-bottom:12px;">
+        <span class="empty-chips" id="log-chips-placeholder">No symptoms selected</span>
+      </div>
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" id="log-search" placeholder="Add symptoms to log…" autocomplete="off"/>
+        <div class="dropdown" id="log-dropdown"></div>
+      </div>
+      <!-- PHOTO UPLOAD (LOG) -->
+      <div class="photo-section" style="margin-bottom:12px;">
+        <div class="photo-dropzone" id="log-dropzone" style="padding:14px 16px;" ondragover="dragOver(event,'log-dropzone')" ondragleave="dragLeave('log-dropzone')" ondrop="dropFiles(event,'log')">
+          <input type="file" accept="image/*" multiple onchange="handleFiles(this.files,'log')"/>
+          <div style="display:flex;align-items:center;gap:10px;justify-content:center;">
+            <span style="font-size:1.4rem;">📷</span>
+            <p style="text-align:left;"><strong style="color:var(--accent)">Attach photos</strong> of visible symptoms<br><span style="font-size:0.78rem;">Rashes, swelling, skin changes — drag &amp; drop or click</span></p>
+          </div>
+        </div>
+        <div class="photo-grid" id="log-photo-grid"></div>
+      </div>
+      <textarea id="log-note" placeholder="Optional notes (e.g. woke up with chills, took ibuprofen at noon)…"></textarea>
+      <div class="log-actions">
+        <button class="btn-log" onclick="addLogEntry()">Save Entry</button>
+        <button class="btn-clear" onclick="clearLog()">Clear All</button>
+      </div>
+    </div>
+    <div class="log-entries" id="log-entries"></div>
+  </div>
+
+  <!-- ABOUT PAGE -->
+  <div id="page-about" class="page">
+    <h1>About SymptomSense</h1>
+    <p class="subtitle">A free, private, offline-capable self-diagnostic tool.</p>
+    <div class="about-card">
+      <h3>🔒 Your data stays on your device</h3>
+      <p>SymptomSense runs entirely in your browser. No data is sent to any server. Your symptom log is stored locally in your browser's storage and never leaves your device.</p>
+    </div>
+    <div class="about-card">
+      <h3>🧬 How it works</h3>
+      <p>The app matches your selected symptoms against a built-in database of 30+ common conditions. Each condition has a weighted symptom list — the more your symptoms overlap, the higher it ranks. Duration and age group adjust severity scores.</p>
+    </div>
+    <div class="about-card">
+      <h3>🚑 Severity levels</h3>
+      <p><strong style="color:var(--accent2)">Manage at home</strong> — Mild symptoms likely from a common, self-limiting illness.<br><br>
+      <strong style="color:var(--warn)">See a doctor soon</strong> — Symptoms warrant professional evaluation within 1–2 days.<br><br>
+      <strong style="color:var(--danger)">Seek emergency care</strong> — Symptoms could indicate a serious or life-threatening condition.</p>
+    </div>
+    <div class="about-card">
+      <h3>⚠️ Important disclaimer</h3>
+      <p>This app does not replace a doctor. It cannot account for your full medical history, perform physical exams, or run tests. Use it as a first step to understand possible causes — then speak with a licensed healthcare professional.</p>
+    </div>
+  </div>
+
+</main>
+
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightbox-img" src="" alt="Symptom photo"/>
+</div>
+
+<script>
+// ─── SYMPTOM DATABASE ───────────────────────────────────────────────────────
+const ALL_SYMPTOMS = [
+  "Fever","Chills","Headache","Fatigue","Muscle aches","Sore throat",
+  "Runny nose","Stuffy nose","Sneezing","Cough (dry)","Cough (wet/productive)",
+  "Shortness of breath","Chest pain","Chest tightness","Rapid heartbeat",
+  "Nausea","Vomiting","Diarrhea","Abdominal pain","Bloating","Constipation",
+  "Loss of appetite","Weight loss (unintended)","Night sweats",
+  "Rash","Itching","Hives","Skin redness","Swollen lymph nodes",
+  "Joint pain","Back pain","Neck stiffness","Eye redness","Watery eyes",
+  "Ear pain","Ear congestion","Dizziness","Lightheadedness","Fainting",
+  "Confusion","Memory issues","Anxiety","Palpitations","Excessive thirst",
+  "Frequent urination","Painful urination","Burning urination",
+  "Loss of smell","Loss of taste","Sensitivity to light","Sensitivity to sound",
+  "Blurred vision","Mouth sores","Swollen tonsils","Bad breath",
+  "Muscle weakness","Numbness or tingling","Swelling (legs/ankles)",
+  "Dark urine","Pale stools","Yellowing of skin/eyes (jaundice)"
+];
+
+// ─── CONDITIONS DATABASE ────────────────────────────────────────────────────
+const CONDITIONS = [
+  {
+    name: "Common Cold",
+    symptoms: ["Runny nose","Stuffy nose","Sneezing","Sore throat","Cough (dry)","Fatigue","Headache"],
+    weight: [3,3,3,2,2,1,1],
+    description: "A viral infection of the upper respiratory tract. Usually mild and resolves in 7–10 days.",
+    severity: "home",
+    remedies: ["Rest","Stay hydrated","Honey & lemon tea","Steam inhalation","Nasal saline rinse"],
+    meds: ["Decongestants (pseudoephedrine)","Antihistamines","Ibuprofen/Acetaminophen","Cough suppressants (dextromethorphan)"],
+    erFlags: []
+  },
+  {
+    name: "Influenza (Flu)",
+    symptoms: ["Fever","Chills","Muscle aches","Fatigue","Headache","Sore throat","Cough (dry)","Loss of appetite"],
+    weight: [3,3,3,3,2,1,2,1],
+    description: "A contagious respiratory illness caused by influenza viruses. More severe than a cold.",
+    severity: "doctor",
+    remedies: ["Bed rest","Fluids","Warm broths","Cold/fever compress"],
+    meds: ["Oseltamivir (Tamiflu) — prescription","Ibuprofen/Acetaminophen","Throat lozenges"],
+    erFlags: ["Shortness of breath","Chest pain","Confusion"]
+  },
+  {
+    name: "COVID-19",
+    symptoms: ["Fever","Cough (dry)","Fatigue","Loss of smell","Loss of taste","Shortness of breath","Muscle aches","Headache","Sore throat","Chills"],
+    weight: [2,2,2,4,4,3,2,1,1,1],
+    description: "Infection caused by SARS-CoV-2. Ranges from mild to severe. Test to confirm.",
+    severity: "doctor",
+    remedies: ["Isolation","Rest","Fluids","Monitor oxygen levels"],
+    meds: ["Acetaminophen/Ibuprofen for fever","Nirmatrelvir/ritonavir (Paxlovid) — prescription","Nasal rinse"],
+    erFlags: ["Shortness of breath","Chest pain","Confusion","Blurred vision"]
+  },
+  {
+    name: "Strep Throat",
+    symptoms: ["Sore throat","Fever","Swollen tonsils","Swollen lymph nodes","Difficulty swallowing","Headache","Nausea"],
+    weight: [4,3,3,2,2,1,1],
+    description: "Bacterial throat infection caused by Streptococcus pyogenes. Requires antibiotics.",
+    severity: "doctor",
+    remedies: ["Salt water gargle","Warm liquids","Throat lozenges","Cold compress on neck"],
+    meds: ["Amoxicillin/Penicillin — prescription (required)","Ibuprofen/Acetaminophen for pain"],
+    erFlags: []
+  },
+  {
+    name: "Seasonal Allergies (Hay Fever)",
+    symptoms: ["Sneezing","Runny nose","Stuffy nose","Eye redness","Watery eyes","Itching","Headache"],
+    weight: [3,3,2,3,3,2,1],
+    description: "Allergic response to airborne allergens like pollen, dust, or pet dander.",
+    severity: "home",
+    remedies: ["Avoid known allergens","HEPA air purifier","Shower after going outdoors","Nasal saline rinse"],
+    meds: ["Loratadine (Claritin)","Cetirizine (Zyrtec)","Fexofenadine (Allegra)","Nasal corticosteroid sprays (Flonase)"],
+    erFlags: ["Shortness of breath","Hives","Swelling of face/throat"]
+  },
+  {
+    name: "Sinusitis",
+    symptoms: ["Stuffy nose","Headache","Facial pain","Runny nose","Cough (wet/productive)","Fatigue","Bad breath","Ear congestion"],
+    weight: [3,3,3,2,2,1,1,1],
+    description: "Inflammation of the sinuses, often following a cold or allergy. Can be viral or bacterial.",
+    severity: "home",
+    remedies: ["Steam inhalation","Warm face compress","Nasal saline rinse","Stay hydrated"],
+    meds: ["Decongestants","Ibuprofen/Acetaminophen","Nasal corticosteroids","Antibiotics if bacterial (prescription)"],
+    erFlags: []
+  },
+  {
+    name: "Bronchitis",
+    symptoms: ["Cough (wet/productive)","Chest tightness","Fatigue","Shortness of breath","Low-grade fever","Muscle aches"],
+    weight: [4,3,2,2,1,1],
+    description: "Inflammation of the bronchial tubes. Usually viral but can be bacterial.",
+    severity: "doctor",
+    remedies: ["Rest","Fluids","Humidifier","Honey & ginger tea"],
+    meds: ["Cough expectorants (guaifenesin)","Bronchodilator inhaler if needed","Ibuprofen","Antibiotics only if bacterial (prescription)"],
+    erFlags: ["Shortness of breath","Chest pain","Coughing blood"]
+  },
+  {
+    name: "Pneumonia",
+    symptoms: ["Cough (wet/productive)","Fever","Chills","Shortness of breath","Chest pain","Fatigue","Muscle aches","Nausea"],
+    weight: [3,3,3,4,4,2,2,1],
+    description: "Infection that inflames air sacs in the lungs. Can be serious, especially in elderly or immunocompromised.",
+    severity: "er",
+    remedies: ["Hospitalization may be required","Rest","Fluids"],
+    meds: ["Antibiotics (prescription required)","Antiviral if viral pneumonia","Oxygen therapy in hospital"],
+    erFlags: ["Shortness of breath","Chest pain","High fever","Confusion"]
+  },
+  {
+    name: "Gastroenteritis (Stomach Flu)",
+    symptoms: ["Nausea","Vomiting","Diarrhea","Abdominal pain","Fever","Muscle aches","Fatigue","Loss of appetite"],
+    weight: [4,4,4,3,2,1,1,1],
+    description: "Viral or bacterial inflammation of the stomach and intestines. Usually self-limiting.",
+    severity: "home",
+    remedies: ["BRAT diet (Bananas, Rice, Applesauce, Toast)","Stay hydrated with electrolytes","Rest","Probiotics"],
+    meds: ["Oral rehydration salts (Pedialyte)","Loperamide (Imodium) for diarrhea","Bismuth subsalicylate (Pepto-Bismol)","Antiemetics (ondansetron — prescription)"],
+    erFlags: ["Signs of dehydration","Blood in stool","Severe abdominal pain","High fever"]
+  },
+  {
+    name: "Acid Reflux / GERD",
+    symptoms: ["Abdominal pain","Bloating","Nausea","Chest pain","Cough (dry)","Bad breath","Sore throat"],
+    weight: [3,2,2,3,2,1,1],
+    description: "Stomach acid backs up into the esophagus, causing heartburn and discomfort.",
+    severity: "home",
+    remedies: ["Avoid spicy/acidic foods","Eat smaller meals","Don't lie down after eating","Elevate head while sleeping","Ginger tea"],
+    meds: ["Antacids (Tums, Maalox)","H2 blockers (famotidine/Pepcid)","PPIs (omeprazole/Prilosec)"],
+    erFlags: ["Severe chest pain","Difficulty swallowing","Vomiting blood"]
+  },
+  {
+    name: "Urinary Tract Infection (UTI)",
+    symptoms: ["Painful urination","Burning urination","Frequent urination","Abdominal pain","Dark urine","Fatigue","Low-grade fever"],
+    weight: [4,4,3,2,2,1,1],
+    description: "Bacterial infection of the urinary tract. More common in females. Requires antibiotics.",
+    severity: "doctor",
+    remedies: ["Drink plenty of water","Unsweetened cranberry juice","Avoid caffeine and alcohol","Urinate frequently"],
+    meds: ["Trimethoprim/sulfamethoxazole — prescription","Nitrofurantoin — prescription","Phenazopyridine for pain (OTC)"],
+    erFlags: ["Fever with chills","Back/flank pain","Nausea and vomiting with UTI symptoms"]
+  },
+  {
+    name: "Migraine",
+    symptoms: ["Headache","Sensitivity to light","Sensitivity to sound","Nausea","Vomiting","Blurred vision","Dizziness","Fatigue"],
+    weight: [4,3,3,2,2,2,1,1],
+    description: "Intense recurring headaches, often with additional neurological symptoms. Triggers vary.",
+    severity: "home",
+    remedies: ["Rest in a dark quiet room","Cold compress on forehead","Hydration","Caffeine in small amounts","Ginger for nausea"],
+    meds: ["Ibuprofen/Naproxen","Sumatriptan (Imitrex) — prescription","Topiramate for prevention — prescription","Antiemetics for nausea"],
+    erFlags: ["Sudden worst headache of life","Confusion","Neck stiffness","Vision loss","Weakness on one side"]
+  },
+  {
+    name: "Hypertension (High Blood Pressure)",
+    symptoms: ["Headache","Dizziness","Blurred vision","Nausea","Chest pain","Palpitations","Shortness of breath"],
+    weight: [2,2,2,1,3,2,2],
+    description: "Elevated blood pressure that often has no symptoms — nicknamed the 'silent killer'. Check with a monitor.",
+    severity: "doctor",
+    remedies: ["Reduce sodium intake","Regular aerobic exercise","Reduce stress","Limit alcohol","DASH diet"],
+    meds: ["ACE inhibitors — prescription","Beta-blockers — prescription","Calcium channel blockers — prescription","Diuretics — prescription"],
+    erFlags: ["Chest pain","Severe headache","Vision changes","Shortness of breath"]
+  },
+  {
+    name: "Anxiety / Panic Attack",
+    symptoms: ["Rapid heartbeat","Palpitations","Shortness of breath","Chest tightness","Dizziness","Nausea","Sweating","Trembling","Numbness or tingling"],
+    weight: [3,3,3,3,2,2,2,2,2],
+    description: "Intense episodes of fear or anxiety with physical symptoms. Can mimic cardiac events.",
+    severity: "home",
+    remedies: ["Box breathing (4-4-4-4)","Grounding techniques (5-4-3-2-1)","Cold water on wrists/face","Regular exercise","Therapy (CBT)"],
+    meds: ["Benzodiazepines — prescription (short-term)","SSRIs for chronic anxiety — prescription","Buspirone — prescription"],
+    erFlags: ["Chest pain that doesn't resolve","First episode — rule out cardiac causes","Fainting"]
+  },
+  {
+    name: "Anemia",
+    symptoms: ["Fatigue","Lightheadedness","Shortness of breath","Rapid heartbeat","Pale skin","Headache","Cold hands/feet","Muscle weakness"],
+    weight: [3,3,2,2,2,1,1,1],
+    description: "Low red blood cell count or hemoglobin, reducing oxygen delivery to tissues.",
+    severity: "doctor",
+    remedies: ["Iron-rich foods (red meat, lentils, spinach)","Vitamin C with iron for absorption","B12-rich foods"],
+    meds: ["Iron supplements (ferrous sulfate)","B12 supplements or injections","Folic acid","Treatment of underlying cause"],
+    erFlags: ["Extreme breathlessness","Chest pain","Rapid or irregular heartbeat","Fainting"]
+  },
+  {
+    name: "Type 2 Diabetes (unmanaged)",
+    symptoms: ["Excessive thirst","Frequent urination","Fatigue","Blurred vision","Slow-healing wounds","Tingling in hands/feet","Weight loss (unintended)"],
+    weight: [4,4,3,2,2,2,2],
+    description: "Chronic condition where the body doesn't use insulin properly. Often asymptomatic early on.",
+    severity: "doctor",
+    remedies: ["Low-carb diet","Regular exercise","Weight management","Blood sugar monitoring"],
+    meds: ["Metformin — prescription","GLP-1 agonists (semaglutide) — prescription","Insulin — prescription","Statins for cardiovascular risk"],
+    erFlags: ["Extreme confusion","Rapid breathing","Fruity breath (possible DKA)","Unconsciousness"]
+  },
+  {
+    name: "Depression",
+    symptoms: ["Fatigue","Loss of appetite","Sleep problems","Anxiety","Muscle aches","Headache","Concentration issues","Isolation"],
+    weight: [3,3,3,2,1,1,2,2],
+    description: "A mood disorder causing persistent sadness, loss of interest, and a range of physical symptoms.",
+    severity: "doctor",
+    remedies: ["Regular exercise","Social connection","Sunlight exposure","Structured routine","Therapy (CBT, DBT)"],
+    meds: ["SSRIs (sertraline, fluoxetine) — prescription","SNRIs (venlafaxine) — prescription","Bupropion — prescription"],
+    erFlags: ["Thoughts of self-harm or suicide — call 988 or go to ER immediately"]
+  },
+  {
+    name: "Appendicitis",
+    symptoms: ["Abdominal pain","Nausea","Vomiting","Fever","Loss of appetite","Diarrhea","Constipation"],
+    weight: [5,3,3,3,2,1,1],
+    description: "Inflammation of the appendix. Pain typically starts around the navel and moves to the lower right abdomen. Medical emergency.",
+    severity: "er",
+    remedies: ["Surgery (appendectomy) is the primary treatment","Do NOT eat/drink or use laxatives if suspected"],
+    meds: ["Antibiotics — IV in hospital","Pain management in hospital"],
+    erFlags: ["Severe lower-right abdominal pain","Fever with abdominal pain","Rigidity of abdomen"]
+  },
+  {
+    name: "Heart Attack (Myocardial Infarction)",
+    symptoms: ["Chest pain","Shortness of breath","Rapid heartbeat","Nausea","Sweating","Dizziness","Jaw pain","Left arm pain","Fatigue"],
+    weight: [5,4,3,2,3,2,3,4,2],
+    description: "Blockage of blood flow to the heart. A life-threatening emergency requiring immediate care.",
+    severity: "er",
+    remedies: ["Call 911 immediately","Chew aspirin (325mg) if not allergic","Do not drive yourself","Loosen tight clothing"],
+    meds: ["Aspirin (immediate)","Nitroglycerin — if prescribed","Thrombolytics/PCI in hospital"],
+    erFlags: ["Chest pain","Shortness of breath","Left arm/jaw pain","Sweating — CALL 911 IMMEDIATELY"]
+  },
+  {
+    name: "Dehydration",
+    symptoms: ["Dizziness","Fatigue","Headache","Dark urine","Dry mouth","Muscle weakness","Nausea","Confusion","Rapid heartbeat"],
+    weight: [3,2,2,3,3,2,1,2,2],
+    description: "Loss of more fluids than taken in. Can range from mild to life-threatening.",
+    severity: "home",
+    remedies: ["Drink water steadily","Oral rehydration salts","Coconut water","Cool environment","Avoid caffeine/alcohol"],
+    meds: ["Oral rehydration salts (Pedialyte, DripDrop)","IV fluids in hospital for severe cases"],
+    erFlags: ["Extreme confusion","No urination for 8+ hours","Rapid heartbeat","Fainting"]
+  },
+  {
+    name: "Conjunctivitis (Pink Eye)",
+    symptoms: ["Eye redness","Watery eyes","Itching","Eye discharge","Sensitivity to light","Blurred vision"],
+    weight: [4,3,3,3,2,1],
+    description: "Inflammation of the conjunctiva. Can be viral, bacterial, or allergic.",
+    severity: "home",
+    remedies: ["Warm compress on eye","Wash hands frequently","Don't touch eyes","Avoid sharing towels/pillowcases"],
+    meds: ["Antibiotic eye drops if bacterial — prescription","Antihistamine eye drops if allergic (Zaditor)","Artificial tears for comfort"],
+    erFlags: ["Severe eye pain","Sudden vision loss","Sensitivity to light with headache"]
+  },
+  {
+    name: "Chicken Pox / Shingles",
+    symptoms: ["Rash","Itching","Fever","Fatigue","Headache","Blisters","Sensitivity to light","Muscle aches"],
+    weight: [5,4,2,2,1,4,1,1],
+    description: "Varicella (chicken pox) or its reactivation as shingles (herpes zoster). Distinctive blister rash.",
+    severity: "doctor",
+    remedies: ["Oatmeal baths for itching","Calamine lotion","Trim nails to avoid scratching","Cool compress","Rest"],
+    meds: ["Acyclovir/Valacyclovir — prescription","Ibuprofen/Acetaminophen","Antihistamines for itching","VZV vaccine (prevention)"],
+    erFlags: ["Rash near eyes","High fever","Difficulty breathing","Rash with confusion"]
+  },
+  {
+    name: "Hypothyroidism",
+    symptoms: ["Fatigue","Weight loss (unintended)","Constipation","Muscle weakness","Joint pain","Sensitivity to cold","Memory issues","Dry skin","Hair loss"],
+    weight: [3,2,2,2,2,3,2,1,1],
+    description: "Underactive thyroid gland producing insufficient thyroid hormone. Diagnosis requires blood test.",
+    severity: "doctor",
+    remedies: ["Iodine-rich foods (seafood, dairy)","Regular exercise","Consistent sleep schedule"],
+    meds: ["Levothyroxine — prescription (long-term hormone replacement)"],
+    erFlags: ["Extreme fatigue","Confusion","Very low heart rate (possible myxedema coma)"]
+  },
+  {
+    name: "Kidney Stones",
+    symptoms: ["Back pain","Abdominal pain","Painful urination","Blood in urine","Nausea","Vomiting","Fever"],
+    weight: [4,4,4,4,2,2,2],
+    description: "Hard deposits in the kidneys that can cause severe pain as they pass through the urinary tract.",
+    severity: "doctor",
+    remedies: ["Drink lots of water","Heat pad on back/side","Strain urine to catch stones for analysis"],
+    meds: ["Ibuprofen/Ketorolac for pain","Alpha-blockers (tamsulosin) to relax ureter — prescription","Lithotripsy or surgery for large stones"],
+    erFlags: ["Severe flank pain","Fever with chills (infection)","Complete inability to urinate","Vomiting that prevents hydration"]
+  },
+  {
+    name: "Eczema / Dermatitis",
+    symptoms: ["Rash","Itching","Skin redness","Dry skin","Blisters"],
+    weight: [4,4,3,2,2],
+    description: "Chronic inflammatory skin condition causing itchy, inflamed skin. Often triggered by allergens or irritants.",
+    severity: "home",
+    remedies: ["Moisturize frequently (fragrance-free)","Avoid known triggers","Cool baths","Wet wrap therapy","Avoid harsh soaps"],
+    meds: ["Topical corticosteroids (hydrocortisone)","Tacrolimus/pimecrolimus — prescription","Antihistamines for itch","Dupilumab for severe cases — prescription"],
+    erFlags: ["Signs of skin infection (warmth, pus, spreading redness)"]
+  },
+  {
+    name: "Mononucleosis (Mono)",
+    symptoms: ["Fatigue","Sore throat","Swollen lymph nodes","Fever","Headache","Rash","Muscle aches","Loss of appetite","Night sweats"],
+    weight: [4,3,3,3,2,1,2,1,1],
+    description: "Caused by Epstein-Barr virus. Extreme fatigue, sore throat, and swollen lymph nodes are hallmarks.",
+    severity: "doctor",
+    remedies: ["Rest — this is key, recovery takes weeks","Stay hydrated","Gargle salt water","Avoid contact sports (spleen risk)"],
+    meds: ["Acetaminophen/Ibuprofen","Corticosteroids for severe swelling — prescription","No specific antiviral treatment"],
+    erFlags: ["Severe abdominal pain (possible spleen rupture)","Difficulty breathing","Extreme throat swelling"]
+  },
+  {
+    name: "Meningitis",
+    symptoms: ["Neck stiffness","Headache","Fever","Sensitivity to light","Sensitivity to sound","Nausea","Vomiting","Confusion","Rash"],
+    weight: [5,4,4,4,3,2,2,4,3],
+    description: "Inflammation of the membranes surrounding the brain and spinal cord. Bacterial meningitis is a medical emergency.",
+    severity: "er",
+    remedies: ["Immediate hospitalization required","IV antibiotics","Supportive care"],
+    meds: ["IV antibiotics (ceftriaxone, penicillin) — hospital","Corticosteroids (dexamethasone) — hospital","Meningitis vaccine (prevention)"],
+    erFlags: ["Neck stiffness + fever + headache — CALL 911","Rash that doesn't fade under pressure (petechiae)","Confusion or altered consciousness"]
+  },
+  {
+    name: "Asthma",
+    symptoms: ["Shortness of breath","Chest tightness","Cough (dry)","Wheezing","Fatigue","Anxiety"],
+    weight: [5,4,3,5,1,1],
+    description: "Chronic condition causing airways to narrow and swell, making breathing difficult. Triggered by allergens, exercise, or irritants.",
+    severity: "doctor",
+    remedies: ["Identify and avoid triggers","Air purifier","Breathing exercises (Buteyko)","Stay hydrated"],
+    meds: ["Short-acting beta agonists (albuterol) — rescue inhaler","Inhaled corticosteroids — controller","Leukotriene modifiers (montelukast) — prescription","Biologics for severe asthma — prescription"],
+    erFlags: ["Severe shortness of breath","Blue lips or fingertips","Unable to speak in full sentences","No relief from rescue inhaler"]
+  },
+  {
+    name: "Food Allergy / Anaphylaxis",
+    symptoms: ["Hives","Rash","Itching","Nausea","Vomiting","Abdominal pain","Shortness of breath","Dizziness","Swelling","Palpitations"],
+    weight: [4,3,3,3,3,2,4,3,4,3],
+    description: "Immune reaction to a specific food. Mild reactions cause hives/GI symptoms; severe reactions (anaphylaxis) are life-threatening.",
+    severity: "er",
+    remedies: ["Avoid known allergens","Carry epinephrine auto-injector (EpiPen)","Medical alert bracelet"],
+    meds: ["Epinephrine (EpiPen) — immediate for anaphylaxis","Antihistamines (diphenhydramine)","Corticosteroids — ER","Bronchodilators if wheezing"],
+    erFlags: ["Throat swelling","Difficulty breathing","Rapid pulse — USE EPIPEN AND CALL 911"]
+  }
+];
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let selectedSymptoms = [];
+let logSymptoms = [];
+let logEntries = JSON.parse(localStorage.getItem('symptomLog') || '[]');
+
+// ─── PAGE NAVIGATION ─────────────────────────────────────────────────────────
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'log') renderLogEntries();
+}
+
+// ─── SYMPTOM SEARCH (CHECKER) ─────────────────────────────────────────────
+const searchInput = document.getElementById('symptom-search');
+const dropdown = document.getElementById('symptom-dropdown');
+
+searchInput.addEventListener('input', () => {
+  const q = searchInput.value.trim().toLowerCase();
+  if (!q) { dropdown.classList.remove('open'); return; }
+  const matches = ALL_SYMPTOMS.filter(s => s.toLowerCase().includes(q) && !selectedSymptoms.includes(s));
+  dropdown.innerHTML = matches.length
+    ? matches.map(s => `<div class="dropdown-item" onclick="addSymptom('${s}')">${s}</div>`).join('')
+    : '<div class="dropdown-item" style="color:var(--muted)">No matches found</div>';
+  dropdown.classList.add('open');
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.search-wrap')) {
+    dropdown.classList.remove('open');
+    document.getElementById('log-dropdown').classList.remove('open');
+  }
+});
+
+function addSymptom(s) {
+  if (selectedSymptoms.includes(s)) return;
+  selectedSymptoms.push(s);
+  renderChips();
+  searchInput.value = '';
+  dropdown.classList.remove('open');
+}
+
+function removeSymptom(s) {
+  selectedSymptoms = selectedSymptoms.filter(x => x !== s);
+  renderChips();
+}
+
+function renderChips() {
+  const container = document.getElementById('chips-container');
+  const placeholder = document.getElementById('chips-placeholder');
+  if (selectedSymptoms.length === 0) {
+    container.innerHTML = '<span class="empty-chips" id="chips-placeholder">No symptoms selected yet</span>';
+    return;
+  }
+  container.innerHTML = selectedSymptoms.map(s =>
+    `<div class="chip">${s}<button onclick="removeSymptom('${s}')" title="Remove">×</button></div>`
+  ).join('');
+}
+
+// ─── DURATION SLIDER ─────────────────────────────────────────────────────────
+function updateDuration() {
+  const v = parseInt(document.getElementById('duration-slider').value);
+  document.getElementById('duration-label').textContent = v === 0 ? 'Today' : v === 1 ? '1 day' : `${v} days`;
+}
+
+// ─── LOG SYMPTOM SEARCH ───────────────────────────────────────────────────────
+const logSearch = document.getElementById('log-search');
+const logDropdown = document.getElementById('log-dropdown');
+
+logSearch.addEventListener('input', () => {
+  const q = logSearch.value.trim().toLowerCase();
+  if (!q) { logDropdown.classList.remove('open'); return; }
+  const matches = ALL_SYMPTOMS.filter(s => s.toLowerCase().includes(q) && !logSymptoms.includes(s));
+  logDropdown.innerHTML = matches.length
+    ? matches.map(s => `<div class="dropdown-item" onclick="addLogSymptom('${s}')">${s}</div>`).join('')
+    : '<div class="dropdown-item" style="color:var(--muted)">No matches found</div>';
+  logDropdown.classList.add('open');
+});
+
+function addLogSymptom(s) {
+  if (logSymptoms.includes(s)) return;
+  logSymptoms.push(s);
+  renderLogChips();
+  logSearch.value = '';
+  logDropdown.classList.remove('open');
+}
+
+function removeLogSymptom(s) {
+  logSymptoms = logSymptoms.filter(x => x !== s);
+  renderLogChips();
+}
+
+function renderLogChips() {
+  const container = document.getElementById('log-chips');
+  if (logSymptoms.length === 0) {
+    container.innerHTML = '<span class="empty-chips" id="log-chips-placeholder">No symptoms selected</span>';
+    return;
+  }
+  container.innerHTML = logSymptoms.map(s =>
+    `<div class="chip">${s}<button onclick="removeLogSymptom('${s}')" title="Remove">×</button></div>`
+  ).join('');
+}
+
+// ─── ANALYZE ─────────────────────────────────────────────────────────────────
+function analyze() {
+  if (selectedSymptoms.length === 0) {
+    alert('Please select at least one symptom.');
+    return;
+  }
+  const duration = parseInt(document.getElementById('duration-slider').value);
+
+  // Score each condition
+  const scored = CONDITIONS.map(cond => {
+    let score = 0, maxScore = 0;
+    cond.symptoms.forEach((s, i) => {
+      const w = cond.weight[i] || 1;
+      maxScore += w;
+      if (selectedSymptoms.includes(s)) score += w;
+    });
+    // Bonus if >=3 symptoms match
+    const matchCount = cond.symptoms.filter(s => selectedSymptoms.includes(s)).length;
+    const pct = maxScore > 0 ? (score / maxScore) * 100 : 0;
+    return { ...cond, score, pct, matchCount };
+  });
+
+  // Filter: at least 1 weighted symptom matched
+  let results = scored.filter(c => c.score > 0).sort((a, b) => b.pct - a.pct).slice(0, 6);
+
+  if (results.length === 0) {
+    document.getElementById('results').style.display = 'block';
+    document.getElementById('severity-banner').innerHTML = '';
+    document.getElementById('conditions-list').innerHTML = '<p style="color:var(--muted)">No conditions matched your symptoms. Try adding more specific symptoms.</p>';
+    return;
+  }
+
+  // Severity: take the highest severity among top 3
+  const severityOrder = { home: 0, doctor: 1, er: 2 };
+  const topSeverity = results.slice(0, 3).reduce((max, c) => severityOrder[c.severity] > severityOrder[max] ? c.severity : max, 'home');
+
+  // Duration bumps severity
+  let effectiveSeverity = topSeverity;
+  if (duration >= 7 && effectiveSeverity === 'home') effectiveSeverity = 'doctor';
+  if (duration >= 14 && effectiveSeverity === 'doctor') effectiveSeverity = 'er';
+
+  // ER flag check
+  const erFlagged = results.some(c => c.erFlags.some(f => selectedSymptoms.some(s => s.toLowerCase().includes(f.toLowerCase()))));
+  if (erFlagged) effectiveSeverity = 'er';
+
+  // Render severity banner
+  const bannerMap = {
+    home: { cls: 'home', icon: '🏠', title: 'Manage at home', msg: 'Your symptoms are consistent with a mild, self-limiting condition. Monitor and rest.' },
+    doctor: { cls: 'doctor', icon: '🩺', title: 'See a doctor soon', msg: 'Consider making an appointment within 1–2 days for proper evaluation.' },
+    er: { cls: 'er', icon: '🚨', title: 'Seek emergency care', msg: 'Your symptoms may indicate a serious condition. Go to the ER or call 911.' }
+  };
+  const b = bannerMap[effectiveSeverity];
+  document.getElementById('severity-banner').innerHTML = `
+    <div class="severity-banner ${b.cls}">
+      <div class="severity-icon">${b.icon}</div>
+      <div class="severity-text"><strong>${b.title}</strong><span>${b.msg}</span></div>
+    </div>`;
+
+  // Render conditions
+  document.getElementById('conditions-list').innerHTML = results.map((c, idx) => {
+    const badgeCls = c.pct >= 55 ? 'match-high' : c.pct >= 30 ? 'match-med' : 'match-low';
+    const matchLabel = c.pct >= 55 ? 'High match' : c.pct >= 30 ? 'Possible' : 'Low match';
+    return `
+    <div class="condition-card">
+      <div class="condition-header" onclick="toggleCondition(${idx})">
+        <span class="condition-name">${c.name}</span>
+        <span class="condition-meta">
+          <span class="match-badge ${badgeCls}">${matchLabel} (${Math.round(c.pct)}%)</span>
+          <svg class="chevron" id="chev-${idx}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="m6 9 6 6 6-6"/></svg>
+        </span>
+      </div>
+      <div class="condition-body" id="body-${idx}">
+        <p>${c.description}</p>
+        <div class="condition-section">
+          <h4>Matching symptoms</h4>
+          <ul>${c.symptoms.filter(s => selectedSymptoms.includes(s)).map(s => `<li>${s}</li>`).join('')}</ul>
+        </div>
+        <div class="condition-section">
+          <h4>Home remedies</h4>
+          <ul>${c.remedies.map(r => `<li class="remedy-pill">${r}</li>`).join('')}</ul>
+        </div>
+        <div class="condition-section">
+          <h4>Medications</h4>
+          <ul>${c.meds.map(m => `<li class="med-pill">${m}</li>`).join('')}</ul>
+        </div>
+        ${c.erFlags.length ? `<div class="condition-section"><h4 style="color:var(--danger)">⚠️ Go to ER if you have</h4><ul>${c.erFlags.map(f=>`<li style="color:var(--danger)">${f}</li>`).join('')}</ul></div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function toggleCondition(idx) {
+  const body = document.getElementById('body-' + idx);
+  const chev = document.getElementById('chev-' + idx);
+  const open = body.classList.toggle('open');
+  chev.style.transform = open ? 'rotate(180deg)' : '';
+}
+
+// ─── LOG ─────────────────────────────────────────────────────────────────────
+function addLogEntry() {
+  if (logSymptoms.length === 0) { alert('Please add at least one symptom.'); return; }
+  const note = document.getElementById('log-note').value.trim();
+  const entry = { id: Date.now(), date: new Date().toLocaleString(), symptoms: [...logSymptoms], note };
+  logEntries.unshift(entry);
+  localStorage.setItem('symptomLog', JSON.stringify(logEntries));
+  logSymptoms = [];
+  renderLogChips();
+  document.getElementById('log-note').value = '';
+  renderLogEntries();
+}
+
+function deleteLogEntry(id) {
+  logEntries = logEntries.filter(e => e.id !== id);
+  localStorage.setItem('symptomLog', JSON.stringify(logEntries));
+  renderLogEntries();
+}
+
+function clearLog() {
+  if (!confirm('Delete all log entries?')) return;
+  logEntries = [];
+  localStorage.setItem('symptomLog', '[]');
+  renderLogEntries();
+}
+
+function renderLogEntries() {
+  const container = document.getElementById('log-entries');
+  if (logEntries.length === 0) {
+    container.innerHTML = '<p class="empty-log">No entries yet. Log your first symptoms above.</p>';
+    return;
+  }
+  container.innerHTML = logEntries.map(e => `
+    <div class="log-entry">
+      <div class="log-entry-header">
+        <span class="log-entry-date">📅 ${e.date}</span>
+        <button class="log-entry-del" onclick="deleteLogEntry(${e.id})" title="Delete">🗑️</button>
+      </div>
+      <div class="log-entry-symptoms">${e.symptoms.map(s => `<div class="chip" style="font-size:.78rem;padding:3px 10px;">${s}</div>`).join('')}</div>
+      ${e.note ? `<p class="log-entry-note">"${e.note}"</p>` : ''}
+    </div>`).join('');
+}
+
+// ─── PHOTO HANDLING ──────────────────────────────────────────────────────────
+const PHOTO_LABELS = [
+  "Rash / skin reaction","Swelling","Bruising / discoloration","Wound / cut","Eye redness",
+  "Skin lesion","Hives / welts","Redness / inflammation","Blistering","Other"
+];
+
+let checkerPhotos = [];  // {dataUrl, label}
+let logPhotos = [];      // {dataUrl, label}
+
+function dragOver(e, id) {
+  e.preventDefault();
+  document.getElementById(id).classList.add('drag-over');
+}
+function dragLeave(id) {
+  document.getElementById(id).classList.remove('drag-over');
+}
+function dropFiles(e, ctx) {
+  e.preventDefault();
+  dragLeave(ctx === 'checker' ? 'checker-dropzone' : 'log-dropzone');
+  handleFiles(e.dataTransfer.files, ctx);
+}
+
+function handleFiles(files, ctx) {
+  const arr = ctx === 'checker' ? checkerPhotos : logPhotos;
+  const gridId = ctx === 'checker' ? 'checker-photo-grid' : 'log-photo-grid';
+  [...files].forEach(file => {
+    if (!file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      arr.push({ dataUrl: e.target.result, label: 'Rash / skin reaction' });
+      renderPhotoGrid(ctx);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderPhotoGrid(ctx) {
+  const arr = ctx === 'checker' ? checkerPhotos : logPhotos;
+  const grid = document.getElementById(ctx === 'checker' ? 'checker-photo-grid' : 'log-photo-grid');
+  if (arr.length === 0) { grid.innerHTML = ''; return; }
+  grid.innerHTML = arr.map((p, i) => `
+    <div class="photo-thumb">
+      <img src="${p.dataUrl}" alt="Symptom photo ${i+1}" onclick="openLightbox('${escStr(p.dataUrl)}')"/>
+      <button class="photo-del" onclick="removePhoto('${ctx}',${i})" title="Remove">✕</button>
+      <select class="photo-tag-select" onchange="setPhotoLabel('${ctx}',${i},this.value)">
+        ${PHOTO_LABELS.map(l => `<option${l===p.label?' selected':''}>${l}</option>`).join('')}
+      </select>
+    </div>`).join('');
+}
+
+function removePhoto(ctx, i) {
+  if (ctx === 'checker') checkerPhotos.splice(i, 1);
+  else logPhotos.splice(i, 1);
+  renderPhotoGrid(ctx);
+}
+
+function setPhotoLabel(ctx, i, val) {
+  if (ctx === 'checker') checkerPhotos[i].label = val;
+  else logPhotos[i].label = val;
+}
+
+function escStr(s) {
+  // safe for inline onclick — return a placeholder key instead
+  return s.slice(0, 30).replace(/['"]/g, '');
+}
+
+// Store full dataUrls by index for lightbox
+function openLightbox(_, el) {
+  // use el to get the actual src
+}
+
+// Override: use event delegation for lightbox open
+document.addEventListener('click', e => {
+  const img = e.target.closest('.photo-thumb img');
+  if (img) { openLightboxSrc(img.src); }
+});
+
+function openLightboxSrc(src) {
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox').classList.add('open');
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+}
+
+// Keyboard close
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+
+// ─── PATCH addLogEntry to include photos ─────────────────────────────────────
+const _origAddLogEntry = addLogEntry;
+// Override addLogEntry to include photos
+window.addLogEntry = function() {
+  if (logSymptoms.length === 0) { alert('Please add at least one symptom.'); return; }
+  const note = document.getElementById('log-note').value.trim();
+  const photos = logPhotos.map(p => ({ dataUrl: p.dataUrl, label: p.label }));
+  const entry = { id: Date.now(), date: new Date().toLocaleString(), symptoms: [...logSymptoms], note, photos };
+  logEntries.unshift(entry);
+  // Store without photos if too large (avoid localStorage quota)
+  try {
+    localStorage.setItem('symptomLog', JSON.stringify(logEntries));
+  } catch(e) {
+    const lite = logEntries.map(e => ({...e, photos: (e.photos||[]).map(p => ({...p, dataUrl: ''}))}));
+    localStorage.setItem('symptomLog', JSON.stringify(lite));
+  }
+  logSymptoms = [];
+  logPhotos = [];
+  renderLogChips();
+  renderPhotoGrid('log');
+  document.getElementById('log-note').value = '';
+  renderLogEntries();
+};
+
+// ─── PATCH renderLogEntries to show photo thumbnails ─────────────────────────
+window.renderLogEntries = function() {
+  const container = document.getElementById('log-entries');
+  if (logEntries.length === 0) {
+    container.innerHTML = '<p class="empty-log">No entries yet. Log your first symptoms above.</p>';
+    return;
+  }
+  container.innerHTML = logEntries.map(e => `
+    <div class="log-entry">
+      <div class="log-entry-header">
+        <span class="log-entry-date">📅 ${e.date}</span>
+        <button class="log-entry-del" onclick="deleteLogEntry(${e.id})" title="Delete">🗑️</button>
+      </div>
+      <div class="log-entry-symptoms">${e.symptoms.map(s => `<div class="chip" style="font-size:.78rem;padding:3px 10px;">${s}</div>`).join('')}</div>
+      ${e.note ? `<p class="log-entry-note">"${e.note}"</p>` : ''}
+      ${(e.photos && e.photos.filter(p=>p.dataUrl).length) ? `
+        <div class="log-entry-photos">
+          ${e.photos.filter(p=>p.dataUrl).map(p => `<img src="${p.dataUrl}" alt="${p.label}" title="${p.label}"/>`).join('')}
+        </div>` : ''}
+    </div>`).join('');
+};
+
+renderLogEntries();
+</script>
+</body>
+</html>
